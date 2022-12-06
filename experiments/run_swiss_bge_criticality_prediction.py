@@ -8,13 +8,17 @@ import random
 import sys
 from dataclasses import dataclass, field
 from typing import Optional
+import pandas as pd
 
 from helper import compute_metrics_multi_class, make_predictions_multi_class, config_wandb, \
-    generate_Model_Tokenizer_for_SequenceClassification, add_oversampling_to_multiclass_dataset, get_data, \
+    generate_Model_Tokenizer_for_SequenceClassification, get_data, \
     preprocess_function
+from helper_scp import get_dataset, remove_unused_features, rename_features, filter_by_length,\
+    add_oversampling_to_multiclass_dataset
 from datasets import utils
 import glob
 import shutil
+import datasets
 from models.hierbert import HierarchicalBert
 from torch import nn
 from datasets import disable_caching
@@ -184,8 +188,9 @@ def main():
 
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    # model_args.model_name_or_path = "bert-base-uncased"
 
-    config_wandb(model_args=model_args, data_args=data_args, training_args=training_args)
+    config_wandb(model_args=model_args, data_args=data_args, training_args=training_args, project_name='scp-test')
 
     # Setup distant debugging if needed
     if data_args.server_ip and data_args.server_port:
@@ -222,7 +227,12 @@ def main():
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
     )
-    logger.info(f"Training/evaluation parameters {training_args}")
+
+    # TODO change
+
+    logger.info(f"Training arguments {training_args}")
+    logger.info(f"Model arguments {model_args}")
+    logger.info(f"Data arguments {data_args}")
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -242,57 +252,40 @@ def main():
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
-    train_dataset, eval_dataset, predict_dataset = get_data(training_args,data_args,model_args,data_args.download_mode)
+    ##################################################################################
+    # Changes for bge_criticality:
+    # Set pramams:
 
-    # filter out not needed columns
-    def remove_unused_features(dataset, feature_col, label):
-        columns_to_remove = ['origin_chamber', 'legal_area', 'considerations', 'facts', 'origin_region', 'court', 'year', 'chamber', 'origin_court', 'origin_canton', 'canton', 'decision_id', 'region', 'language', 'bge_label', 'citation_label']
-        columns_to_keep = [feature_col, label, 'language']
-        columns_to_remove = [ele for ele in columns_to_remove if ele not in columns_to_keep]
-        for column in columns_to_remove:
-            if column in dataset.column_names:
-                dataset = dataset.remove_columns(column)
-        return dataset
+    if data_args.running_mode == "experimental":
+        experimental_samples = True
+    else:
+        experimental_samples = False
 
-    predict_dataset = remove_unused_features(predict_dataset, 'facts', 'bge_label')
-    eval_dataset = remove_unused_features(eval_dataset, 'facts', 'bge_label')
-    train_dataset = remove_unused_features(train_dataset, 'facts', 'bge_label')
+    feature_col = 'facts'  # must be either facts, considerations (or in future judgment)
+    # remove_non_critical = false
+    # filter_attribute_value = social_law  # must be a region (...) or a legal area (...)
 
-    # rename to input, label and language
-    def rename_features(dataset, feature_col, label_name):
-        dataset = dataset.rename_column(feature_col, "input")
-        dataset = dataset.rename_column(label_name, 'label')
-        return dataset
+    ds_dict = {'train': get_dataset(experimental_samples, training_args.do_train, 'train'),
+               'validation': get_dataset(experimental_samples, training_args.do_eval, 'validation'),
+               'test': get_dataset(experimental_samples, training_args.do_predict, 'test')}
 
-    # TODO add this as params from outside
-    # Rename features, depending on what feature_col and label is wanted for the experiment
-    predict_dataset = rename_features(predict_dataset, 'facts', 'bge_label')
-    eval_dataset = rename_features(eval_dataset, 'facts', 'bge_label')
-    train_dataset = rename_features(train_dataset, 'facts', 'bge_label')
+    for k in ds_dict:
+        ds_dict[k] = remove_unused_features(ds_dict[k], feature_col, 'bge_label')
+        ds_dict[k] = rename_features(ds_dict[k], feature_col, 'bge_label')
+        ds_dict[k] = ds_dict[k].filter(filter_by_length)
 
-    # filter out cases with too short input
-    def filter_by_length(example):
-        """
-        Removes examples that are too short
-        :param example:    the example to check
-        :return:
-        """
-        if len(str(example["input"])) > 100:
-            return True
-        return False
-
-    logger.info(train_dataset)
-
-    # filter out cases where input is too short
-    predict_dataset = predict_dataset.filter(filter_by_length)
-    eval_dataset = eval_dataset.filter(filter_by_length)
-    train_dataset = train_dataset.filter(filter_by_length)
+    train_dataset = ds_dict['train']
+    eval_dataset = ds_dict['validation']
+    predict_dataset = ds_dict['test']
 
     logger.info(train_dataset)
 
     # Labels
     label_list = ["critical", " non-critical"]
     num_labels = len(label_list)
+
+    # End changes
+    ######################################################################################
 
     label2id = dict()
     id2label = dict()
@@ -306,6 +299,8 @@ def main():
         logger.info("Oversampling the minority class")
         train_dataset = add_oversampling_to_multiclass_dataset(train_dataset=train_dataset, id2label=id2label,
                                                                data_args=data_args)
+    logger.info(train_dataset)
+    logger.info(train_dataset.features)
 
     model, tokenizer, config = generate_Model_Tokenizer_for_SequenceClassification(model_args=model_args,
                                                                                    data_args=data_args,

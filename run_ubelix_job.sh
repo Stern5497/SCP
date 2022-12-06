@@ -7,7 +7,7 @@
 #SBATCH --mem=64GB
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:rtx3090:1
-#SBATCH --time=5:00:00
+#SBATCH --time=24:00:00
 #SBATCH --qos=job_gpu_preempt
 #SBATCH --partition=gpu
 #SBATCH --array=2-4
@@ -27,12 +27,15 @@ module load Workspace Anaconda3/2021.11-foss-2021a CUDA/11.3.0-GCC-10.2.0
 
 # Activate correct conda environment
 eval "$(conda shell.bash hook)"
-conda activate scp
+conda activate scp-test
 
 # Put your code below this line
 
-python main.py -t swiss_bge_criticality_prediction -od results/final_results -los ${SLURM_ARRAY_TASK_ID} --num_train_epochs 50 --language_model_type xlm-roberta-large
+# python main.py -t swiss_bge_criticality_prediction -od results/final_results -los ${SLURM_ARRAY_TASK_ID} --num_train_epochs 10
 
+python main.py --task swiss_bge_criticality_prediction -los 1 --num_train_epochs 10 -od results/test_scp --language_model_type distilbert-base-multilingual-cased --hierarchical True --running_mode default
+
+# python main.py --task swiss_bge_criticality_prediction -los 1 --num_train_epochs 10 -od results/test_scp --language_model_type distilbert-base-multilingual-cased --hierarchical True
 
 # IMPORTANT:
 # Run with                  sbatch run_hpc_job.sh

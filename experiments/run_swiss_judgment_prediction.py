@@ -9,7 +9,9 @@ import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
-from helper import compute_metrics_multi_class, make_predictions_multi_class, config_wandb, generate_Model_Tokenizer_for_SequenceClassification, add_oversampling_to_multiclass_dataset, get_data, preprocess_function
+from helper import compute_metrics_multi_class, make_predictions_multi_class, config_wandb, \
+    generate_Model_Tokenizer_for_SequenceClassification, add_oversampling_to_multiclass_dataset, get_data, \
+    preprocess_function
 from datasets import utils
 import glob
 import shutil
@@ -32,7 +34,6 @@ from transformers.trainer_utils import get_last_checkpoint
 
 disable_caching()
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -40,7 +41,6 @@ logger = logging.getLogger(__name__)
 class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
-
     Using `HfArgumentParser` we can turn this class
     into argparse arguments to be able to specify them on
     the command line.
@@ -50,7 +50,7 @@ class DataTrainingArguments:
         default=512,
         metadata={
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
-            "than this will be truncated, sequences shorter will be padded."
+                    "than this will be truncated, sequences shorter will be padded."
         },
     )
     max_segments: Optional[int] = field(
@@ -74,50 +74,50 @@ class DataTrainingArguments:
         default=True,
         metadata={
             "help": "Whether to pad all samples to `max_seq_length`. "
-            "If False, will pad the samples dynamically when batching to the maximum length in the batch."
+                    "If False, will pad the samples dynamically when batching to the maximum length in the batch."
         },
     )
     max_train_samples: Optional[int] = field(
         default=None,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
-            "value if set."
+                    "value if set."
         },
     )
     max_eval_samples: Optional[int] = field(
         default=None,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of evaluation examples to this "
-            "value if set."
+                    "value if set."
         },
     )
     max_predict_samples: Optional[int] = field(
         default=None,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of prediction examples to this "
-            "value if set."
+                    "value if set."
         },
     )
-    language:Optional[str] = field(
+    language: Optional[str] = field(
         default='all',
         metadata={
             "help": "For choosin the language "
-            "value if set."
+                    "value if set."
         },
     )
-    running_mode:Optional[str] = field(
+    running_mode: Optional[str] = field(
         default='default',
         metadata={
             "help": "If set to 'experimental' only a small portion of the original dataset will be used for fast experiments"
         },
     )
-    finetuning_task:Optional[str] = field(
+    finetuning_task: Optional[str] = field(
         default='swiss_judgment_prediction',
         metadata={
             "help": "Name of the finetuning task"
         },
     )
-    download_mode:Optional[str] = field(
+    download_mode: Optional[str] = field(
         default='reuse_cache_if_exists',
         metadata={
             "help": "Name of the finetuning task"
@@ -170,7 +170,7 @@ class ModelArguments:
         default=False,
         metadata={
             "help": "Will use the token generated when running `transformers-cli login` (necessary to use this script "
-            "with private models)."
+                    "with private models)."
         },
     )
 
@@ -183,9 +183,7 @@ def main():
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-
-    config_wandb(model_args=model_args, data_args=data_args,training_args=training_args)
-
+    config_wandb(model_args=model_args, data_args=data_args, training_args=training_args)
 
     # Setup distant debugging if needed
     if data_args.server_ip and data_args.server_port:
@@ -242,9 +240,7 @@ def main():
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
-    train_dataset, eval_dataset, predict_dataset = get_data(training_args,data_args,model_args,data_args.download_mode)
-
-    logger.info(train_dataset.features)
+    train_dataset, eval_dataset, predict_dataset = get_data(training_args, data_args)
 
     # Labels
     label_list = ["dismissal", "approval"]
@@ -253,20 +249,19 @@ def main():
     label2id = dict()
     id2label = dict()
 
-    for n,l in enumerate(label_list):
-        label2id[l]=n
-        id2label[n]=l
-
+    for n, l in enumerate(label_list):
+        label2id[l] = n
+        id2label[n] = l
 
     # NOTE: This is not optimized for multiclass classification
     if training_args.do_train:
         logger.info("Oversampling the minority class")
-        train_dataset = add_oversampling_to_multiclass_dataset(train_dataset=train_dataset,id2label=id2label,data_args=data_args)
+        train_dataset = add_oversampling_to_multiclass_dataset(train_dataset=train_dataset, id2label=id2label,
+                                                               data_args=data_args)
 
-
-
-    model, tokenizer, config = generate_Model_Tokenizer_for_SequenceClassification(model_args=model_args, data_args=data_args, num_labels=num_labels)
-
+    model, tokenizer, config = generate_Model_Tokenizer_for_SequenceClassification(model_args=model_args,
+                                                                                   data_args=data_args,
+                                                                                   num_labels=num_labels)
 
     if training_args.do_train:
         if data_args.max_train_samples is not None:
@@ -304,8 +299,7 @@ def main():
                 num_proc=data_args.preprocessing_num_workers,
                 desc="Running tokenizer on prediction dataset",
             )
-    
-    
+
     # Data collator will default to DataCollatorWithPadding, so we change it if we already did the padding.
     if data_args.pad_to_max_length:
         data_collator = default_data_collator
@@ -319,8 +313,6 @@ def main():
     training_args.evaluation_strategy = IntervalStrategy.EPOCH
     training_args.logging_strategy = IntervalStrategy.EPOCH
 
-    
-    
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -370,10 +362,10 @@ def main():
         langs = train_dataset['language'] + eval_dataset['language'] + predict_dataset['language']
         langs = sorted(list(set(langs)))
 
-        make_predictions_multi_class(trainer=trainer,training_args=training_args,data_args=data_args,predict_dataset=predict_dataset,id2label=id2label,name_of_input_field="input",list_of_languages=langs)
+        make_predictions_multi_class(trainer=trainer, training_args=training_args, data_args=data_args,
+                                     predict_dataset=predict_dataset, id2label=id2label, name_of_input_field="input",
+                                     list_of_languages=langs)
 
-
-    
     # Clean up checkpoints
     checkpoints = [filepath for filepath in glob.glob(f'{training_args.output_dir}/*/') if '/checkpoint' in filepath]
     for checkpoint in checkpoints:

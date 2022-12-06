@@ -1,33 +1,33 @@
-# LEXTREME: A Multlingual Benchmark Dataset for Legal Language Understanding 
+# SCP: A Multlingual Benchmark Dataset for Legal Language Understanding 
 
 ## Dataset Summary
 [comming soon]
 ## Supported Tasks
 [comming soon]
-## LEXTREME Scores
+## SCP Scores
 [comming soon]
 ## Frequently Asked Questions (FAQ)
 
 ### Where are the datasets?
-We provide access to LEXTREME at https://huggingface.co/datasets/joelito/lextreme.  
+We provide access to SCP at https://huggingface.co/datasets/Stern5497/SCP
 
-For example, to load the swiss_judgment_prediction ([Niklaus, Chalkidis, and Stürmer 2021](https://aclanthology.org/2021.nllp-1.3/)) dataset, you first simply install the datasets python library and then make the following call:
+For example, to load the swiss_criticality_prediction ([Stern, Niklaus, and Stürmer 2023](https://blabalbla)) dataset, you first simply install the datasets python library and then make the following call:
 
 ```python
 
 from datasets import load_dataset
 
-dataset = load_dataset("joelito/lextreme", "swiss_judgment_prediction")
+dataset = load_dataset("Stern5497/SCP")
 
 ```
 
 
 ### How to run experiments?
 
-The folder [experiments](https://github.com/JoelNiklaus/LEXTREME/tree/main/experiments) contains all python scripts to run the finetuning for each task seperately. For example, if you want to finetune on the ```swiss_judgment_prediction``` dataset, you could do so by typing the following command and replace the curly brackets and the content therein with your variables:  
+The folder [experiments](https://github.com/Stern5497/SCP/tree/main/experiments) contains all python scripts to run the finetuning. For example, if you want to finetune on the ```swiss_criticality_prediction``` dataset, you could do so by typing the following command and replace the curly brackets and the content therein with your variables:  
 
 ```
-CUDA_VISIBLE_DEVICES={GPU_NUMBER} python ./experiments/run_swiss_judgment_prediction.py \
+CUDA_VISIBLE_DEVICES={GPU_NUMBER} python ./experiments/run_swiss_bge_criticality_prediction.py \
   --model_name_or_path  {MODEL_NAME_OR_PATH} \
   --output_dir {OUTPUT_DIR} \
   --do_train \
@@ -58,7 +58,7 @@ CUDA_VISIBLE_DEVICES={GPU_NUMBER} python ./experiments/run_swiss_judgment_predic
 
 ### How reproduce the results of the paper?
 
-It is possible to reproduce the results of the paper by running the finetuning for each dataset separately. Alternatively, you can run [main.py](https://github.com/JoelNiklaus/LEXTREME/tree/main/main.py) which, in a nutshell, will generate bash scripts for each dataset with the necessary hyperparameters and run them on every available GPU in your system (if available). 
+It is possible to reproduce the results of the paper by running the finetuning for each dataset separately. Alternatively, you can run [main.py](https://github.com/Stern5497/SCP/tree/main/main.py) which, in a nutshell, will generate bash scripts for each dataset with the necessary hyperparameters and run them on every available GPU in your system (if available). 
 
 The following command will make sure that you run all experiments as described in the paper:
 
@@ -87,27 +87,19 @@ It allows a certain degree of customizability by specifying the following argume
 | -od | --output_dir | Specify the output directory for the logs. | Generated automatically with a time stamp.
 
 
-For example, if you want to finetune on ```swiss_judgment_prediction``` with the seeds [1,2,3], 10 epochs, and all pretrained language models as described in the paper, you can type the following:
+For example, if you want to finetune on ```swiss_criticality_prediction``` with 10 epochs, and all pretrained language models as described in the paper, you can type the following:
 
 ```
-python main.py --task swiss_judgment_prediction -python main.py --task swiss_judgment_prediction -list_of_seeds
- 1,2,3 --num_train_epochs 10
+python main.py --task swiss_judgment_prediction --num_train_epochs 10
 ```
 
-Temporary bash files will be created and saved in the folder [temporary_scripts](https://github.com/JoelNiklaus/LEXTREME/tree/main/temporary_scripts) and they will be run immediately. These bash files will be overwritten the next time you run main.py.
+Temporary bash files will be created and saved in the folder [temporary_scripts](https://github.com/Stern5497/SCP/tree/main/temporary_scripts) and they will be run immediately. These bash files will be overwritten the next time you run main.py.
 
 If you want to finetune only on, let's say, ```xlm-roberta-large```, you can type the following command.
 ```
-python main.py --task swiss_judgment_prediction -python main.py --task swiss_judgment_prediction -list
- 1,2,3 --num_train_epochs 10 --language_model_type xlm-roberta-large
+python main.py --task swiss_judgment_prediction --num_train_epochs 10 --language_model_type xlm-roberta-large --hierarchical False
 ```
 
-If, additionally, you don't want to make use of a hierarchical model (```swiss_judgment_prediction``` makes use of hierarchical models due to the length of the input documents), you type the following.
-```
-python main.py --task swiss_judgment_prediction -python main.py --task swiss_judgment_prediction -list
- 1,2,3 --num_train_epochs 10 --language_model_type xlm-roberta-large --hierarchical False
-```
-Not all tasks support the use of hierarchical types. For example, the code for the named entity recognition tasks has not been optimized to make use of both the non-hierarchical and the hierarchical variants. Thefore, setting ```-hierarchical``` to True will cause an error.
 
 ## References
 
