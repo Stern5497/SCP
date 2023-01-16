@@ -33,7 +33,7 @@ conda activate scp-test
 
 # python main.py -t swiss_bge_criticality_prediction -od results/final_results -los ${SLURM_ARRAY_TASK_ID} --num_train_epochs 10
 
-python main.py --task swiss_bge_criticality_prediction -los 1 --num_train_epochs 10 -od results/test_scp --language_model_type distilbert-base-multilingual-cased --hierarchical True --running_mode default
+python main.py --task swiss_bge_criticality_prediction -gm 24 -bz 8 -los 1 --num_train_epochs 10 -ld results/test_scp --language_model_type microsoft/mdeberta-v3-base --hierarchical True --running_mode experimental
 
 # python main.py --task swiss_bge_criticality_prediction -los 1 --num_train_epochs 10 -od results/test_scp --language_model_type distilbert-base-multilingual-cased --hierarchical True
 

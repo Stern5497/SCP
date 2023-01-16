@@ -1,7 +1,7 @@
 value="$(cat running_mode.txt)"
 RUNNING_MODE=$value
 
-GPU_NUMBER=0
+GPU_NUMBER=24
 LOWER_CASE='True'
 BATCH_SIZE=10
 ACCUMULATION_STEPS=1

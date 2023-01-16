@@ -26,19 +26,98 @@ from models.hierbert import (build_hierarchical_model,
                              get_tokenizer)
 
 
+def filter_dataset_by_language(dataset, language):
+    if language not in ["all"]:
+        dataset = dataset.filter(lambda x: x["language"] == language)
+
+    return dataset
+
+
+def make_efficient_split(data_args, split_name, ner_tasks):
+    if data_args.running_mode == "debug":
+        split_name = split_name + '[:100]'
+    if data_args.running_mode == "experimental":
+        split_name = split_name + '[:5%]'
+
+    if data_args.dataset_cache_dir is None:
+        dataset = load_dataset("joelito/lextreme", data_args.finetuning_task, split=split_name,
+                               download_mode=data_args.download_mode)
+
+    else:
+        if not os.path.exists(data_args.dataset_cache_dir):
+            os.mkdir(data_args.dataset_cache_dir)
+
+        dataset = load_dataset("joelito/lextreme", data_args.finetuning_task, split=split_name,
+                               cache_dir=data_args.dataset_cache_dir, download_mode=data_args.download_mode)
+
+    if bool(re.search('eurlex', data_args.finetuning_task)):
+        dataset = split_into_languages(dataset)
+
+    if data_args.finetuning_task in ner_tasks:
+        dataset = dataset.rename_column("label", "labels")
+
+    dataset = filter_dataset_by_language(dataset, data_args.language)
+
+    return dataset
+
+
+def make_split_with_postfiltering(data_args, split_name, ner_tasks):
+    if data_args.dataset_cache_dir is None:
+        dataset = load_dataset("joelito/lextreme", data_args.finetuning_task, split=split_name,
+                               download_mode=data_args.download_mode)
+
+    else:
+        if not os.path.exists(data_args.dataset_cache_dir):
+            os.mkdir(data_args.dataset_cache_dir)
+
+        dataset = load_dataset("joelito/lextreme", data_args.finetuning_task, split=split_name,
+                               cache_dir=data_args.dataset_cache_dir, download_mode=data_args.download_mode)
+
+    if bool(re.search('eurlex', data_args.finetuning_task)):
+        dataset = split_into_languages(dataset)
+
+    if data_args.finetuning_task in ner_tasks:
+        dataset = dataset.rename_column("label", "labels")
+
+    dataset = filter_dataset_by_language(dataset, data_args.language)
+
+    # When filtering for languages, the amount of data is very small. In those cases, the distinction between debug and experimental may not make sense or
+    # can lead to errors, if, for example, the amount of data is smaller than 100
+    if len(dataset["input"]) > 1000:
+        if data_args.running_mode == "debug":
+            dataset = dataset.select([n for n in range(0, 100)])
+        if data_args.running_mode == "experimental":
+            num_rows_10_percent = int(round(dataset.num_rows * 0.1, 0))
+            dataset = dataset.select([n for n in range(0, num_rows_10_percent)])
+
+    elif len(dataset["input"]) > 100:
+        if data_args.running_mode in ["debug", "experimental"]:
+            dataset = dataset.select([n for n in range(0, 100)])
+
+    return dataset
+
+
 def make_split(data_args, split_name):
     ner_tasks = ['greek_legal_ner', 'lener_br', 'legalnero', 'mapa_coarse', 'mapa_fine']
 
-    if data_args.running_mode == "experimental":
-        dataset = load_dataset("joelito/lextreme", data_args.finetuning_task, split=split_name + '[:5%]',
-                               cache_dir="datasets_caching", download_mode=data_args.download_mode)
+    multilingual_datasets = ['swiss_judgment_prediction',
+                             'online_terms_of_service_unfairness_level',
+                             'online_terms_of_service_unfairness_category',
+                             'covid19_emergency_event',
+                             'multi_eurlex_level_1',
+                             'multi_eurlex_level_2',
+                             'multi_eurlex_level_3',
+                             'mapa_coarse',
+                             'mapa_fine'
+                             ]
+
+    if data_args.finetuning_task in multilingual_datasets and data_args.language not in ["all"]:
+
+        dataset = make_split_with_postfiltering(data_args, split_name, ner_tasks)
+
     else:
-        dataset = load_dataset("joelito/lextreme", data_args.finetuning_task, split=split_name,
-                               cache_dir="datasets_caching", download_mode=data_args.download_mode)
-    if bool(re.search('eurlex', data_args.finetuning_task)):
-        dataset = split_into_languages(dataset)
-    if data_args.finetuning_task in ner_tasks:
-        dataset = dataset.rename_column("label", "labels")
+
+        dataset = make_efficient_split(data_args, split_name, ner_tasks)
 
     return dataset
 
@@ -63,8 +142,12 @@ def append_zero_segments(case_encodings, pad_token_id, data_args):
 
 
 def add_oversampling_to_multiclass_dataset(train_dataset, id2label, data_args):
-    for k in id2label.keys():
-        train_dataset = do_oversampling_to_multiclass_dataset(train_dataset, id2label, data_args)
+    if len(id2label.keys()) > 1:  # Otherwise there might be some errors when filtering by language because of the class imbalance
+        for k in id2label.keys():
+            try:
+                train_dataset = do_oversampling_to_multiclass_dataset(train_dataset, id2label, data_args)
+            except:
+                pass
 
     return train_dataset
 
@@ -85,6 +168,7 @@ def do_oversampling_to_multiclass_dataset(train_dataset, id2label, data_args):
             majority_id = label_id
 
     datasets = [train_dataset]
+
     num_full_minority_sets = int(majority_len / minority_len)
     for i in range(num_full_minority_sets - 1):  # -1 because one is already included in the training dataset
         datasets.append(label_datasets[minority_id])
@@ -580,9 +664,8 @@ def make_predictions_ner(trainer, tokenizer, data_args, predict_dataset, id2labe
 
 def config_wandb(training_args, model_args, data_args, project_name=None):
     time_now = datetime.datetime.now().isoformat()
-    time_now = datetime.datetime.now().isoformat()
     if project_name is None:
-        project_name = 'final_results'
+        project_name = data_args.log_directory.split('/')[-1]
     wandb.init(project=project_name)
     try:
         run_name = data_args.finetuning_task + '_' + model_args.model_name_or_path + '_seed-' + str(
@@ -628,8 +711,7 @@ def generate_Model_Tokenizer_for_TokenClassification(model_args, data_args, num_
     model = AutoModelForTokenClassification.from_pretrained(
         model_args.model_name_or_path,
         config=config,
-        use_auth_token=True if model_args.use_auth_token else None,
-        force_download=True
+        use_auth_token=True if model_args.use_auth_token else None
     )
 
     tokenizer = get_tokenizer(model_args.model_name_or_path)
@@ -638,4 +720,4 @@ def generate_Model_Tokenizer_for_TokenClassification(model_args, data_args, num_
     # if model_args.hierarchical == True:
     # model = build_hierarchical_model(model, data_args.max_segments, data_args.max_seg_length)
 
-    return model, tokenizer  # , config
+    return model, tokenizer

@@ -133,6 +133,18 @@ class DataTrainingArguments:
         default=8,
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
+    dataset_cache_dir: str = field(
+        default=None,
+        metadata={
+            "help": "Specify the directory you want to cache your datasets."
+        },
+    )
+    log_directory: str = field(
+        default=None,
+        metadata={
+            "help": "Specify the directory where you want to save your logs."
+        },
+    )
 
     server_ip: Optional[str] = field(default=None, metadata={"help": "For distant debugging."})
     server_port: Optional[str] = field(default=None, metadata={"help": "For distant debugging."})
@@ -207,6 +219,10 @@ def main():
         'Tokenizer do_lower_case False'
     else:
         model_args.do_lower_case = True
+
+    # set batch_size manually
+    training_args.per_decive_eval_batch_size = int(training_args.per_decive_eval_batch_size / 2)
+    training_args.per_device_train_batch_size = int(training_args.per_device_train_batch_size / 2)
 
     # Setup logging
     logging.basicConfig(

@@ -1,0 +1,16 @@
+Found Hyperparams for scp:
+
+Batch size per model:
+- distilbert-base-multilingual-cased: 16
+- xlm-roberta-base: 8
+- xlm-roberta-large:
+- microsoft/Multilingual-MiniLM-L12-H384:
+- microsoft/mdeberta-v3-base:
+
+Max_sequence_length per model:
+
+
+max_segments per model:
+
+
+hyperparams also per task?

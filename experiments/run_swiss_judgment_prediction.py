@@ -32,8 +32,6 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 
-disable_caching()
-
 logger = logging.getLogger(__name__)
 
 
@@ -126,6 +124,18 @@ class DataTrainingArguments:
     preprocessing_num_workers: Optional[int] = field(
         default=8,
         metadata={"help": "The number of processes to use for the preprocessing."},
+    )
+    dataset_cache_dir: str = field(
+        default=None,
+        metadata={
+            "help": "Specify the directory you want to cache your datasets."
+        },
+    )
+    log_directory: str = field(
+        default=None,
+        metadata={
+            "help": "Specify the directory where you want to save your logs."
+        },
     )
 
     server_ip: Optional[str] = field(default=None, metadata={"help": "For distant debugging."})
@@ -273,10 +283,6 @@ def main():
                 num_proc=data_args.preprocessing_num_workers,
                 desc="Running tokenizer on train dataset",
             )
-
-        # Log a few random samples from the training set:
-        for index in random.sample(range(len(train_dataset)), 3):
-            logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
 
     if training_args.do_eval:
         if data_args.max_eval_samples is not None:
